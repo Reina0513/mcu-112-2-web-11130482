@@ -7,13 +7,18 @@ header {
   text-align: center;
 }
 
+section.body {
+  margin: 0 auto;
+  width: 90%;
+}
+
 nav {
   margin-bottom: 10px;
 }
 
 .card {
-  border: solid 1px #999;
-  border-radius: 8px;
+  outline: solid 1px #999;
+  /* border-radius: 8px; */
   width: 250px;
 }
 
