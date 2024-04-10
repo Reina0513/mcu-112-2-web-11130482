@@ -10,3 +10,8 @@ console.log("Is Show = ", isShow);
 
 let creatDate = undefined;
 console.log("Create Date = ", creatDate);
+
+let modifyDate: Date | undefined;
+console.log("Modify Date = ", modifyDate);
+
+let type: "none" | "doing" | "finish" = "doing";
