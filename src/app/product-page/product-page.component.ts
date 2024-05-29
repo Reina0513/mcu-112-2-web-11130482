@@ -3,9 +3,9 @@ import { Component, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, startWith, switchMap } from 'rxjs';
-import { Product } from '../model/product';
 import { ProductCardListComponent } from '../product-card-list/product-card-list.component';
 import { ProductService } from '../services/product.service';
+import { Product } from './../model/product';
 
 @Component({
   selector: 'app-product-page',
@@ -19,13 +19,22 @@ export class ProductPageComponent {
 
   private productService = inject(ProductService);
 
+  protected pageSize = 5;
+
   private readonly refresh$ = new Subject<void>();
 
   protected readonly formControl = new FormControl<string | undefined>(undefined, { nonNullable: true });
 
+  pageIndex = 1;
+
   readonly products$ = this.refresh$.pipe(
     startWith(undefined),
     switchMap(() => this.productService.getList('書籍B', 1, 5))
+  );
+
+  readonly totalCount$ = this.refresh$.pipe(
+    startWith(undefined),
+    switchMap(() => this.productService.getCount())
   );
 
   onAdd(): void {
