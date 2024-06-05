@@ -1,92 +1,81 @@
-import { JsonPipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
-import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Data, Router } from '@angular/router';
-import { filter, map, tap } from 'rxjs';
-import { IProductForm } from '../interface/product-form.interface';
+import { AsyncPipe, JsonPipe } from '@angular/common';
+import { Component, inject } from '@angular/core';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { BehaviorSubject, Subject, combineLatest, startWith, switchMap, tap } from 'rxjs';
 import { Product } from '../model/product';
+import { ProductCardListComponent } from '../product-card-list/product-card-list.component';
 import { ProductService } from '../services/product.service';
 
 @Component({
-  selector: 'app-product-form-page',
+  selector: 'app-product-page',
   standalone: true,
-  imports: [JsonPipe, ReactiveFormsModule],
-  templateUrl: './product-form-page.component.html',
-  styleUrl: './product-form-page.component.css',
+  imports: [AsyncPipe, JsonPipe, ReactiveFormsModule, ProductCardListComponent],
+  templateUrl: './product-page.component.html',
+  styleUrl: './product-page.component.css',
 })
-export class ProductFormPageComponent implements OnInit {
-  private readonly route = inject(ActivatedRoute);
+export class ProductPageComponent {
+  router = inject(Router);
 
-  form = new FormGroup<IProductForm>({
-    id: new FormControl<number | null>(null),
-    name: new FormControl<string | null>(null, { validators: [Validators.required] }),
-    authors: new FormArray<FormControl<string | null>>([]),
-    company: new FormControl<string | null>(null, { validators: [Validators.required] }),
-    isShow: new FormControl<boolean>(false, { nonNullable: true }),
-    price: new FormControl<number | null>(null, { validators: [Validators.required] }),
-  });
+  private productService = inject(ProductService);
 
-  get id(): FormControl<number | null> {
-    return this.form.get('id') as FormControl<number | null>;
+  protected pageSize = 5;
+
+  protected readonly formControl = new FormControl<string | undefined>(undefined, { nonNullable: true });
+
+  private readonly refresh$ = new Subject<void>();
+
+  private readonly condition$ = new BehaviorSubject<string | undefined>(undefined);
+  get condition() {
+    return this.condition$.value;
+  }
+  set condition(value: string | undefined) {
+    this.condition$.next(value);
   }
 
-  get name(): FormControl<string | null> {
-    return this.form.get('name') as FormControl<string | null>;
+  private readonly pageIndex$ = new BehaviorSubject<number>(1);
+  get pageIndex() {
+    return this.pageIndex$.value;
+  }
+  set pageIndex(value: number) {
+    this.pageIndex$.next(value);
   }
 
-  get authors(): FormArray<FormControl<string | null>> {
-    return this.form.get('authors') as FormArray<FormControl<string | null>>;
+  readonly products$ = combineLatest([
+    this.refresh$.pipe(
+      startWith(undefined),
+      tap((condition) => console.log('refresh', condition))
+    ),
+    this.condition$.pipe(tap((condition) => console.log('condition', condition))),
+    this.pageIndex$.pipe(tap((index) => console.log('pageIndex', index))),
+  ]).pipe(
+    tap((data) => console.log(data)),
+    switchMap(([_, condition, pageIndex]) => this.productService.getList(condition, pageIndex, this.pageSize)),
+    tap((data) => console.log(data))
+  );
+
+  readonly totalCount$ = combineLatest([this.refresh$.pipe(startWith(undefined)), this.condition$]).pipe(
+    switchMap(([_, condition]) => this.productService.getCount(condition))
+  );
+
+  onPageIndexChange(index: number): void {
+    console.log(index);
+    this.pageIndex = index;
   }
 
-  get company(): FormControl<string | null> {
-    return this.form.get('company') as FormControl<string | null>;
+  onAdd(): void {
+    this.router.navigate(['product', 'form']);
   }
 
-  get isShow(): FormControl<boolean> {
-    return this.form.get('isShow') as FormControl<boolean>;
+  onEdit(product: Product): void {
+    this.router.navigate(['product', 'form', product.id]);
   }
 
-  get price(): FormControl<number | null> {
-    return this.form.get('price') as FormControl<number | null>;
+  onRemove({ id }: Product): void {
+    this.productService.remove(id).subscribe(() => this.refresh$.next());
   }
 
-  private readonly router = inject(Router);
-
-  private readonly productService = inject(ProductService);
-
-  ngOnInit(): void {
-    this.route.data
-      .pipe(
-        map(({ product }: Data) => product as Product),
-        filter((product) => !!product),
-        tap(({ authors }) => this.onAddAuthors(authors.length))
-      )
-      .subscribe((product) => this.form.patchValue(product));
-  }
-
-  onAddAuthors(count = 1): void {
-    for (let i = 1; i <= count; i++) {
-      const formControl = new FormControl<string | null>(null, { validators: [Validators.required] });
-      this.authors.push(formControl);
-    }
-  }
-
-  onSave(): void {
-    const formData = new Product({
-      id: this.id.value ?? undefined,
-      name: this.name.value!,
-      authors: this.authors.value.map((author) => author!),
-      company: this.company.value!,
-      isShow: this.isShow.value,
-      imgUrl: 'https://api.fnkr.net/testimg/200x200/DDDDDD/999999/?text=img',
-      createDate: new Date(),
-      price: this.price.value!,
-    });
-    const action$ = this.id.value ? this.productService.update(formData) : this.productService.add(formData);
-    action$.subscribe(() => this.router.navigate(['products']));
-  }
-
-  onCancel(): void {
-    this.router.navigate(['products']);
+  onView(product: Product): void {
+    this.router.navigate(['product', 'view', product.id]);
   }
 }
